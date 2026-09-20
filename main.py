@@ -5,8 +5,11 @@ import matplotlib.pyplot as plt
 from pydantic import BaseModel, Field
 from typing import List, Literal
 from dotenv import load_dotenv
+import os
+from google import genai
 
 load_dotenv()
+client = genai.Client()
 
 class SentimentResult(BaseModel):
     sentiment: Literal['positive', 'neutral', 'negative'] = Field(
@@ -30,40 +33,35 @@ MOCK_DATASET = [
     "This is the worst experience I've ever had. I want a refund right now."
 ]
 
-def simulate_llm_extraction(text: str) -> dict:
-    #API latency
-    latency = random.uniform(0.5, 2.5)
-    time.sleep(latency)
-    
-    input_tokens = len(text.split()) * 1.5
-    output_tokens = random.uniform(20, 50)
-    total_tokens = int(input_tokens + output_tokens)
-    
-    text_lower = text.lower()
-    
-    if "love" in text_lower or "great" in text_lower:
-        sentiment = "positive"
-        action_required = False
-        key_topics = ["dashboard", "workflow", "usability"]
-    elif "worst" in text_lower or "crashing" in text_lower or "refund" in text_lower:
-        sentiment = "negative"
-        action_required = True
-        key_topics = ["crash", "pdf_upload", "refund", "stability"]
-    elif "add" in text_lower or "request" in text_lower or "dark mode" in text_lower:
-        sentiment = "neutral"
-        action_required = False
-        key_topics = ["feature_request", "dark_mode"]
-    else:
-        sentiment = "neutral"
-        action_required = bool(random.choice([True, False]))
-        key_topics = ["general", "customer_service"]
-        
-    result = SentimentResult(
-        sentiment=sentiment,
-        confidence_score=round(random.uniform(0.7, 0.99), 2),
-        key_topics=key_topics,
-        action_required=action_required
-    )
+from google.genai.errors import ServerError, ClientError
+
+def extract_with_gemini(text: str) -> dict:
+    """ Google Gemini API to extract structured sentiment."""
+    for attempt in range(5):
+        try:
+            start_time = time.perf_counter()
+            
+            response = client.models.generate_content(
+                model='gemini-3.6-flash',
+                contents=text,
+                config=genai.types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=SentimentResult,
+                ),
+            )
+            
+            latency = time.perf_counter() - start_time
+            prompt_tokens = response.usage_metadata.prompt_token_count
+            completion_tokens = response.usage_metadata.candidates_token_count
+            
+            result = SentimentResult.model_validate_json(response.text)
+            break
+        except (ServerError, ClientError) as e:
+            if attempt < 4:
+                print(f"API Error ({e}). Retrying in 5 seconds (attempt {attempt+1}/5)...")
+                time.sleep(5)
+            else:
+                raise e
     
     return {
         "text": text,
@@ -72,7 +70,7 @@ def simulate_llm_extraction(text: str) -> dict:
         "key_topics": ", ".join(result.key_topics),
         "action_required": result.action_required,
         "latency_sec": round(latency, 3),
-        "total_tokens": total_tokens
+        "total_tokens": prompt_tokens + completion_tokens
     }
 
 def process_dataset():
@@ -80,7 +78,7 @@ def process_dataset():
     print("Starting extraction pipeline...")
     for i, text in enumerate(MOCK_DATASET):
         print(f"Processing text {i+1}/{len(MOCK_DATASET)}...")
-        res = simulate_llm_extraction(text)
+        res = extract_with_gemini(text)
         results.append(res)
     
     df = pd.DataFrame(results)
