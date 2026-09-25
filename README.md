@@ -62,7 +62,7 @@ Side-by-side comparison of **Strict JSON** versus **Few-Shot** prompting across 
 ![Strategy Comparison](strategy_comparison_plot.png)
 
 ---
-## 🛠️ How to Reproduce (Setup & Run)
+## How to Reproduce (Setup & Run)
 
 Follow these step-by-step instructions to clone, set up, and run the project locally.
 
