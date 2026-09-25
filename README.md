@@ -84,3 +84,6 @@ llm-text-analytics/
 ├── comparison.py                 # Benchmarking engine (Strict JSON vs. Few-Shot evaluation)
 ├── summary_plot.png              # Output chart: sentiment counts and latency per review
 └── strategy_comparison_plot.png  # Output chart: empirical comparison metrics
+```
+
+> **Development Note:** Architectural scaffolding, mock datasets, and benchmarking scripts were iteratively developed using **Google Antigravity** paired with **Google Gemini**.
